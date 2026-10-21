@@ -23,3 +23,7 @@ Newest entry at the bottom. One entry per working session: what was done, decisi
   - Generator: Claude Sonnet 5.5. Baseline #3 runs twice: Opus 5.5 and GPT-6.
   - Diversity axes: persona, domain, length, noise, artifact. Sampled per request with a seed.
   - Schema: JSONL with `id`, `prompt`, `task_type`, `complexity`, `label_source`, `meta`. IDs prefixed by split.
+  - Shared template: one system prompt, JSON-only output, loss on the completion only. Malformed output counts as wrong and parse failures are reported per model.
+  - Test discipline: rules, template and LoRA hyperparameters are tuned on val only. Test is scored once. If anything changes after that, report both versions and say which saw the test set.
+  - Versioning: JSONL committed straight to git. `shared/template_v1.txt`, `data/MANIFEST.json`, tags `rules-v1`, `data-v1`, `template-v1` (created when each is frozen, not yet). Every result records git SHA, data tag and template version. The hand-labeled test file is committed only once labeling is complete. Tagged data is never edited in place.
+- First commit: scope, labeling guidelines, rules baseline, glossary.

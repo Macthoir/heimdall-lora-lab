@@ -37,6 +37,7 @@ This is a homelab portfolio project. Write docs and commit messages plainly. Nev
 - Synthetic data only. No real company prompts or traces.
 - Training runs on a rented 4090-class GPU (~$25 budget). Log GPU hours and cost in `docs/run-log.md`. Data generation, eval and serving run locally on AMD.
 - Stdlib only for `baselines/rules.py` so it can run anywhere the gateway does.
+- Tune rules, prompt template and hyperparameters on val only. Score test once. Details and versioning tags are in `docs/run-log.md`.
 
 ## Commands
 
