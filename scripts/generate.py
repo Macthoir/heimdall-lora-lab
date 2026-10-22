@@ -194,7 +194,7 @@ def normalize(s: str) -> str:
 def load_existing(path: Path):
     rows = []
     if path.exists():
-        with path.open() as f:
+        with path.open(encoding="utf-8") as f:
             rows = [json.loads(line) for line in f if line.strip()]
     return rows
 
@@ -208,7 +208,7 @@ def main(argv=None, client=None) -> None:
     ap.add_argument("--dry-run", action="store_true", help="print the first request and exit")
     args = ap.parse_args(argv)
 
-    guidelines = GUIDELINES.read_text()
+    guidelines = GUIDELINES.read_text(encoding="utf-8")
     existing = load_existing(args.out)
     have = Counter((r["task_type"], r["complexity"]) for r in existing)
     seen = {normalize(r["prompt"]) for r in existing}
@@ -220,7 +220,7 @@ def main(argv=None, client=None) -> None:
         client = anthropic.Anthropic()
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    with args.out.open("a") as out:
+    with args.out.open("a", encoding="utf-8") as out:
         for task in TASK_TYPES:
             for complexity in COMPLEXITIES:
                 # Seed per cell, so resuming or reordering never changes a cell's specs.
