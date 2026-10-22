@@ -96,6 +96,9 @@ More docs (baselines, training, results, human eval) will be added under `docs/`
 ## Commands
 
 ```
+pip install anthropic   # generator only; needs ANTHROPIC_API_KEY
+python scripts/generate.py --run trainval --per-cell 30 --seed 1 --out data/raw/trainval.jsonl
+python scripts/generate.py --run test --per-cell 10 --seed 2 --out data/raw/test_unlabeled.jsonl
 python -m unittest tests/test_rules.py
 python baselines/rules.py data/test.jsonl > results/rules_preds.jsonl
 ```
