@@ -97,7 +97,7 @@ More docs (baselines, training, results, human eval) will be added under `docs/`
 
 ```
 pip install anthropic   # generator only; needs ANTHROPIC_API_KEY
-python scripts/generate.py --run trainval --per-cell 30 --seed 1 --out data/raw/smoke.jsonl --max-requests 1   # ~1 cent check
+python scripts/generate.py --run trainval --per-cell 30 --seed 1 --out data/raw/trainval.jsonl --max-requests 1   # smoke test; the full run resumes from it
 python scripts/generate.py --run trainval --per-cell 30 --seed 1 --out data/raw/trainval.jsonl
 python scripts/generate.py --run test --per-cell 10 --seed 2 --out data/raw/test_unlabeled.jsonl
 python -m unittest tests/test_rules.py
