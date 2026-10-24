@@ -167,6 +167,22 @@ def parse_prompts(text: str, n: int) -> list:
     return [x.strip() for x in items]
 
 
+USAGE = {"requests": 0, "input_tokens": 0, "output_tokens": 0,
+         "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
+MAX_BAD_BATCHES = 3  # consecutive unparseable batches in one cell before giving up
+
+
+class StopRun(Exception):
+    """Raised to stop cleanly; rows written so far are kept and the run can resume."""
+
+
+def retryable(e: Exception) -> bool:
+    # Retry only transient failures: no HTTP status (connection/timeout), 408, 429, 5xx.
+    # Anything else (400 low credit balance, 401 bad key, 403, 404 bad model) fails at once.
+    status = getattr(e, "status_code", None)
+    return status is None or status in (408, 429) or status >= 500
+
+
 def call_model(client, request: dict, retries: int = 4) -> str:
     for attempt in range(retries):
         try:
@@ -178,10 +194,19 @@ def call_model(client, request: dict, retries: int = 4) -> str:
                          "cache_control": {"type": "ephemeral"}}],
                 messages=[{"role": "user", "content": request["user"]}],
             )
+            USAGE["requests"] += 1
+            usage = getattr(resp, "usage", None)
+            for k in USAGE:
+                if k != "requests":
+                    USAGE[k] += getattr(usage, k, 0) or 0
+            if getattr(resp, "stop_reason", None) == "max_tokens":
+                raise ValueError("response hit max_tokens and was cut off")
             return "".join(b.text for b in resp.content if b.type == "text")
-        except Exception as e:  # network or rate-limit errors: back off and retry
-            if attempt == retries - 1:
-                raise
+        except ValueError:
+            raise
+        except Exception as e:
+            if not retryable(e) or attempt == retries - 1:
+                raise StopRun(f"API error, not retrying: {e}") from e
             wait = 2 ** attempt * 5
             print(f"  API error ({e.__class__.__name__}), retrying in {wait}s", file=sys.stderr)
             time.sleep(wait)
@@ -194,7 +219,7 @@ def normalize(s: str) -> str:
 def load_existing(path: Path):
     rows = []
     if path.exists():
-        with path.open() as f:
+        with path.open(encoding="utf-8") as f:
             rows = [json.loads(line) for line in f if line.strip()]
     return rows
 
@@ -206,9 +231,22 @@ def main(argv=None, client=None) -> None:
     ap.add_argument("--seed", type=int, required=True)
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--dry-run", action="store_true", help="print the first request and exit")
+    ap.add_argument("--max-requests", type=int, default=None,
+                    help="stop after this many API requests (e.g. 1 for a cheap smoke test)")
     args = ap.parse_args(argv)
+    try:
+        run(args, client)
+    except StopRun as e:
+        print(f"\nStopped: {e}", file=sys.stderr)
+        print("Rows written so far are kept. Rerun the same command to resume.", file=sys.stderr)
+    finally:
+        if not args.dry_run:
+            print(f"\nUsage: {USAGE}", file=sys.stderr)
 
-    guidelines = GUIDELINES.read_text()
+
+def run(args, client) -> None:
+
+    guidelines = GUIDELINES.read_text(encoding="utf-8")
     existing = load_existing(args.out)
     have = Counter((r["task_type"], r["complexity"]) for r in existing)
     seen = {normalize(r["prompt"]) for r in existing}
@@ -220,7 +258,7 @@ def main(argv=None, client=None) -> None:
         client = anthropic.Anthropic()
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    with args.out.open("a") as out:
+    with args.out.open("a", encoding="utf-8") as out:
         for task in TASK_TYPES:
             for complexity in COMPLEXITIES:
                 # Seed per cell, so resuming or reordering never changes a cell's specs.
@@ -229,7 +267,10 @@ def main(argv=None, client=None) -> None:
                 # Burn the specs already used, so a resumed run doesn't repeat them.
                 for _ in range(have[(task, complexity)]):
                     sample_spec(rng, task, complexity)
+                bad = 0
                 while needed > 0:
+                    if args.max_requests is not None and USAGE["requests"] >= args.max_requests:
+                        raise StopRun(f"reached --max-requests {args.max_requests}")
                     specs = [sample_spec(rng, task, complexity) for _ in range(min(BATCH, needed))]
                     request = build_request(guidelines, task, complexity, specs)
                     if args.dry_run:
@@ -238,8 +279,12 @@ def main(argv=None, client=None) -> None:
                     try:
                         prompts = parse_prompts(call_model(client, request), len(specs))
                     except ValueError as e:
-                        print(f"  {task}/{complexity}: bad output ({e}), retrying batch", file=sys.stderr)
+                        bad += 1
+                        print(f"  {task}/{complexity}: bad output ({e}), {bad}/{MAX_BAD_BATCHES}", file=sys.stderr)
+                        if bad >= MAX_BAD_BATCHES:
+                            raise StopRun(f"{MAX_BAD_BATCHES} bad batches in a row for {task}/{complexity}")
                         continue
+                    bad = 0
                     for prompt, spec in zip(prompts, specs):
                         if normalize(prompt) in seen:
                             continue  # exact duplicate; the cell loop asks for a replacement

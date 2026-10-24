@@ -36,3 +36,5 @@ Newest entry at the bottom. One entry per working session: what was done, decisi
 - Raw output goes to `data/raw/`. The train/val split and test ID handling happen in later steps.
 - GPU spend: $0 (total $0 / $25).
 - Next: run the generator locally, spot-check a few cells, then the GPT-6 relabel step.
+- First real run failed on "credit balance too low". The Claude subscription doesn't cover API usage; that needs Console credits. No rows were written.
+- Hardened `generate.py` against wasted spend: billing, auth and bad-model errors now stop at once instead of retrying; a cell stops after 3 unparseable batches in a row; truncated responses count as bad batches; `--max-requests N` allows a cheap smoke test; token usage is printed when the run ends.
