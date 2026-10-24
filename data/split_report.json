@@ -1,0 +1,119 @@
+{
+  "input": "data\\raw\\trainval.json1",
+  "seed": 42,
+  "total_rows": 540,
+  "train_rows": 432,
+  "val_rows": 108,
+  "per_cell": {
+    "code_generation": {
+      "low": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      },
+      "medium": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      },
+      "high": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      }
+    },
+    "debugging": {
+      "low": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      },
+      "medium": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      },
+      "high": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      }
+    },
+    "code_explanation_review": {
+      "low": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      },
+      "medium": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      },
+      "high": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      }
+    },
+    "writing_docs": {
+      "low": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      },
+      "medium": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      },
+      "high": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      }
+    },
+    "data_analysis": {
+      "low": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      },
+      "medium": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      },
+      "high": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      }
+    },
+    "research_qa": {
+      "low": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      },
+      "medium": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      },
+      "high": {
+        "total": 30,
+        "train": 24,
+        "val": 6
+      }
+    }
+  },
+  "near_duplicates": {
+    "jaccard_threshold": 0.85,
+    "pairs": 0,
+    "groups": 0,
+    "pair_list": [],
+    "group_list": []
+  },
+  "val_shortfalls": []
+}
