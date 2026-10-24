@@ -57,3 +57,5 @@ dmypy.json
 
 # Logs
 *.log
+# Generated eval outputs; reproducible from the commands in the README
+results/
