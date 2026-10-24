@@ -38,3 +38,60 @@ Newest entry at the bottom. One entry per working session: what was done, decisi
 - Next: run the generator locally, spot-check a few cells, then the GPT-6 relabel step.
 - First real run failed on "credit balance too low". The Claude subscription doesn't cover API usage; that needs Console credits. No rows were written.
 - Hardened `generate.py` against wasted spend: billing, auth and bad-model errors now stop at once instead of retrying; a cell stops after 3 unparseable batches in a row; truncated responses count as bad batches; `--max-requests N` allows a cheap smoke test; token usage is printed when the run ends.
+
+## 2026-10-24 (Sat): train/val relabel review
+
+- Reviewed all 540 synthetic train/val prompts in this Codex session against `docs/labeling-guidelines.md`; assigned labels per prompt rather than running the rules baseline. This was not a blind review: the source labels and generation metadata were visible.
+- Source filename is actually `data/raw/trainval.json1` (digit 1), not the requested `data/raw/trainval.jsonl`. Used the existing file without renaming or editing it.
+- Wrote all 540 records to `data/relabeled_gpt6.jsonl` with `label_source: gpt6`, preserving source order, IDs, prompts and metadata.
+- Wrote exactly 96 disagreements to the user-requested `data/borderline.jsonl` (rather than the earlier planned `borderline_pool.jsonl`). Each includes the new labels, `original_labels` (including original label source), and a prompt-specific `relabel_reason`. There are 95 complexity-only changes and one task-only change: the duplicate-load upsert request is debugging because its main deliverable fixes existing unexpected behavior.
+- Verified both outputs parse as JSONL, all labels are allowed, every source row is preserved, and the disagreement file contains exactly the changed records with matching original labels and reasons. Existing train/val split files were not rebuilt; excluding disagreements from training remains a separate step. No test-set scoring or baseline tuning was done.
+- GPU hours: 0; GPU spend: $0 (total $0 / $25). No external generation API calls were made for this review.
+- Next: review disagreements, then rebuild the train/val split from agreed records.
+
+### Follow-up: exclude disagreements
+
+- Removed all 96 IDs listed in `data/borderline.jsonl` from `data/relabeled_gpt6.jsonl` at the user's request. The relabeled file now contains 444 agreed records; the borderline file remains unchanged for review.
+- Verified all 444 remaining records parse and no borderline ID remains. Preserved retained JSONL records and their order. Existing `data/train.jsonl` and `data/val.jsonl` were not changed.
+- GPU hours: 0; GPU spend: $0 (total $0 / $25).
+
+### Follow-up: restore disagreements with flags
+
+- User reversed the exclusion request. Restored all 540 reviewed records to `data/relabeled_gpt6.jsonl` in original source order, adding the boolean `disagreement` to every record: true for 96 changed labels and false for 444 agreements.
+- Restored records retain the reviewed labels, `original_labels`, and prompt-specific `relabel_reason` from `data/borderline.jsonl`. The separate borderline file remains unchanged. Existing train/val split files remain unchanged.
+- Verified the output parses, contains all 540 source IDs in order, preserves prompts, and has exactly 96 flags matching actual label differences; all flagged records retain original labels and reasons.
+- GPU hours: 0; GPU spend: $0 (total $0 / $25).
+
+### Follow-up: hand-labeling sample
+
+- Randomly sampled 30 unique disagreement records without replacement from `data/borderline.jsonl` into root-level `hand_labeling.json1`. Each JSONL record contains only `id` and `prompt`, with no labels, flags or reasons.
+- Verified 30 unique IDs and the two-field schema. GPU hours: 0; GPU spend: $0 (total $0 / $25).
+
+## 2026-10-24 (Sat)
+
+- Project extended from one week to two. Day 3 resumed today.
+- Split `data/raw/trainval.json1` into `data/train.jsonl` (432) and `data/val.jsonl` (108), seed 42, stratified 24 train / 6 val per cell. This corrects the 2026-10-21 entry, which said 5 per cell for val. Checked: 0 near-duplicate pairs at Jaccard 0.85, no ID or prompt overlap between files, all 18 cells balanced.
+- Relabeled all 540 rows with [FILL IN: exact model name and reasoning setting]. 96 disagreements (about 18%). Relabel results live in a separate file. `train.jsonl` and `val.jsonl` keep the target labels and are not edited in place. Disagreement rows go to `data/borderline_pool.jsonl` and are excluded from training. Disagreeing val rows stay in val, flagged.
+- Observation: the relabeler rates complexity lower than the target label. The differences are mostly low vs medium, on prompts with large pasted logs or several services mentioned when only one is under investigation. This is consistent with the guidelines (effort, not size; pick the lower level when unsure). Treating it as a wash overall. Guidelines stay frozen.
+- Labeler note (applies to my hand labeling of the test set): background, large logs and unrelated services do not raise complexity. Only material I must reason over to answer counts. If the cause is stated outright in the log, it is `low`. If it takes reasoning across several parts of the pasted content, it is `medium`. If it spans components or needs design tradeoffs, it is `high`. When unsure, pick the lower level.
+- Length check (train + val): median words by complexity are low 66, medium 96, high 121, with heavily overlapping ranges. The generator's `length` axis is spread evenly across complexity. Length is a weak shortcut, so a length-only baseline is added as a sanity check.
+- GPU spend: $0 (total $0 / $25).
+- Next: score the rules baseline on val, then the length-only baseline.
+## 2026-10-24 (Sat): baselines on val
+
+- Scored two baselines on `data/val.jsonl` (108 rows, target labels). Val only; `data/test.jsonl` was not read. Rules were not edited or tuned this session, so this is the untuned `rules-v1` rules at git SHA 4087228 (`baselines/rules.py` unchanged since that commit). The `rules-v1` tag is not created yet.
+- Added `baselines/length_only.py` and `tests/test_length_only.py`: complexity from word count alone, two thresholds fitted on `data/train.jsonl` only (grid search over observed counts, ties go to lower thresholds). Fitted t1=57, t2=108 words, train accuracy 0.484. Thresholds saved to `results/length_only_thresholds.json`. These two files are not committed yet.
+- Results on val (target labels). Single 108-row run with no intervals, so a few points of difference is noise.
+
+| Baseline | task_type acc | task_type macro-F1 | complexity acc | complexity macro-F1 | cell exact-match |
+|---|---|---|---|---|---|
+| Length-only | n/a | n/a | 0.4815 | 0.4779 | n/a |
+| Rules (`rules-v1`) | 0.4259 | 0.3807 | 0.5833 | 0.5939 | 23/108 (0.213) |
+
+- Rules, complexity confusion (rows true, cols predicted; low/medium/high): low 22/14/0, medium 12/20/4, high 2/13/21. Only 2 errors are off by two levels; the rest are adjacent. Medium has the lowest F1 (0.482).
+- Rules, task_type: debugging is the only strong class (17 of 18 correct, F1 0.63). code_generation (11 of 18), code_explanation_review (8 of 18) and data_analysis (7 of 18) mostly fall through to the `research_qa` default, which means the keyword patterns miss most of those prompts. Left as is; fixing it means tuning on val, which would be a new rules version.
+- Length-only: complexity confusion low 16/11/9, medium 8/13/15, high 3/10/23. Rules beat the length floor by about 10 points on complexity accuracy; both are well below anything I'd call a good classifier. The LoRA model has to clear 0.48 (length) and 0.58 (rules) on complexity, and 0.43 on task_type, to say it learned more than the cheap baselines. These are val numbers; the test comparison is separate and scored once.
+- Files: `results/rules_val_preds.jsonl`, `results/length_only_val_preds.jsonl`, `results/length_only_thresholds.json`. Scoring for the rules baseline used a throwaway script (no scorer in the repo yet).
+- GPU hours: 0; GPU spend: $0 (total $0 / $25).
+- Froze `rules-v1`: annotated local tag at commit 4087228 covering `baselines/rules.py`, `tests/test_rules.py` and `docs/labeling-guidelines.md`. All three were unchanged since the first commit (c69b5b4) and `tests/test_rules.py` passes. The tag message records their blob ids and the val numbers above. Not pushed. Any later change to these files is a new version (`rules-v2`), not an edit.
+- Next: Day 4, the LoRA run. `baselines/length_only.py`, its tests and this log are still uncommitted.
