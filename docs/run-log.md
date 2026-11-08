@@ -118,10 +118,10 @@ Built:
 
 Reproduced with `score.py` (val, target labels), matching the 2026-10-24 entry:
 
-| Model | task_type acc | complexity acc | complexity macro-F1 | task_type macro-F1 | cell exact-match |
-|---|---|---|---|---|---|
-| Rules (`rules-v1`) | 0.4259 [0.337, 0.520] | 0.5833 [0.489, 0.672] | 0.5939 | 0.3807 | 23/108 (0.213) |
-| Length-only (t1=57, t2=108) | n/a | 0.4815 [0.390, 0.575] | 0.4779 | n/a | n/a |
+| Model                       | task_type acc         | complexity acc        | complexity macro-F1 | task_type macro-F1 | cell exact-match |
+| --------------------------- | --------------------- | --------------------- | ------------------- | ------------------ | ---------------- |
+| Rules (`rules-v1`)          | 0.4259 [0.337, 0.520] | 0.5833 [0.489, 0.672] | 0.5939              | 0.3807             | 23/108 (0.213)   |
+| Length-only (t1=57, t2=108) | n/a                   | 0.4815 [0.390, 0.575] | 0.4779              | n/a                | n/a              |
 
 - Rules complexity errors: 45, of which 43 off by one and 2 off by two. Length-only: 56 errors, 44 off by one and 12 off by two.
 - Borderline subset (21 val rows): rules task 10/21, complexity 9/21, cell 2/21; length-only complexity 9/21.
@@ -147,9 +147,9 @@ Ran the prompted frontier baseline through `scripts/run_prompted.py` and scored 
 
 Results (val, target labels, 95% Wilson intervals on accuracies):
 
-| Model | task_type acc | complexity acc | complexity macro-F1 | task_type macro-F1 | cell exact-match |
-|---|---|---|---|---|---|
-| Opus 5.5 (`effort=low`) | 1.000 [0.966, 1.000] | 0.870 [0.794, 0.921] | 0.873 | 1.000 | 94/108 (0.870) |
+| Model                   | task_type acc        | complexity acc       | complexity macro-F1 | task_type macro-F1 | cell exact-match |
+| ----------------------- | -------------------- | -------------------- | ------------------- | ------------------ | ---------------- |
+| Opus 5.5 (`effort=low`) | 1.000 [0.966, 1.000] | 0.870 [0.794, 0.921] | 0.873               | 1.000              | 94/108 (0.870)   |
 
 - task_type: 108/108 correct. All 14 cell errors are complexity errors, so cell accuracy equals complexity accuracy.
 - Complexity confusion (rows true, cols predicted; low/medium/high): low 31/5/0, medium 5/31/0, high 0/4/32. All 14 errors are off by one, none off by two.
@@ -159,3 +159,46 @@ Results (val, target labels, 95% Wilson intervals on accuracies):
 - Files: `results/opus_val_preds.jsonl`, `results/opus_val_scores.json`, `results/summary.md` (regenerated).
 - GPU hours: 0; GPU spend: $0 (total $0 / $25). The Opus API cost is separate from the GPU budget.
 - Next: base Qwen prompted run, the NeMo LoRA job on `data/nemo/`, then the A/B sheet.
+
+## 2026-11-08 (Sun): GPU session prep
+
+Everything for one rented-GPU session is written. Nothing was trained, no GPU was used, no paid API calls were made. GPU hours: 0; GPU spend: $0 (total $0 / $25).
+
+Built: `train/lora_qwen25_1p5b.yaml`, `train/requirements-gpu.txt`, `scripts/preflight_train.py`, `scripts/gpu_session.sh` (with `--dry-run`), `tests/test_train_config.py`. No rules-v1 files, data files or `shared/template_v1.txt` were touched.
+
+Decisions and deviations:
+
+- **NeMo AutoModel is pinned at 0.7.0** (2026-10-21), which pins `transformers==5.18.0` and needs Python 3.11+. vLLM is pinned at 0.32.0 (transformers 5.16.1 to 5.19, torch 2.13.0). The one overlap is torch 2.13.0 + transformers 5.18.0, so both go in one requirements file and one venv (`.venv-gpu`, made with uv). If the resolver refuses, the fallback is two venvs. I read the YAML keys from the 0.7.0 wheel source; the recipe has not been run.
+- **Max sequence length 1536.** Longest train row is 1,305 tokens (val 1,015, median about 480), measured with the Qwen2.5 `tokenizer.json` and the ChatML layout rendered by hand (exact when a system message is present). The preflight rechecks this with the real chat template on the pod.
+- **"All linear layers" is `target_modules: ['*_proj']`** (q, k, v, o, gate, up, down), not `match_all_linear`, because in 0.7.0 that also wraps `lm_head` and the library says it breaks vLLM.
+- **Loss on the assistant turn only.** Qwen2.5's template has no `{% generation %}` block, so NeMo falls back to prefix arithmetic, which also supervises the `<|im_start|>assistant` header. `mask_generation_prompt: true` removes that. The preflight decodes the supervised tokens of row 0 and must see the label JSON + `<|im_end|>` only.
+- **Hyperparameters I picked beyond the spec:** global batch 16 (8 x 2 accumulation), AdamW with no weight decay, constant LR 1e-4 with no warmup or decay. That is 23 steps per epoch, 69 in total on 357 rows. Not tuned.
+- **Validation loss runs at the end of each epoch** (checkpoint + validate defaults). The final epoch's adapter is the one used; NeMo's `LOWEST_VAL` link is ignored.
+- **The script refuses to retrain after `lora` has been scored** unless `--allow-rescore`, since val is the held-out test set. A stale `lora_val_preds.jsonl` is moved aside rather than resumed.
+- Tests: 106 existing + 9 new. 7 of the new ones need PyYAML and skip without it (108 pass, 7 skip on the laptop; all 115 pass with PyYAML installed).
+
+### GPU session
+
+Before the pod: `git push` from the laptop. The commits are local only, and the pod clones from GitHub. If the repo is private, clone with a read-only token.
+
+Pod: RunPod PyTorch template, 1x RTX 4090, container disk 40 GB or more (my estimate: torch, CUDA libs and vLLM take about 15 GB). Then:
+
+```
+cd /workspace
+git clone https://github.com/Macthoir/heimdall-lora-lab.git
+cd heimdall-lora-lab
+pip install pyyaml && bash scripts/gpu_session.sh --dry-run     # optional, 10 seconds
+nohup bash scripts/gpu_session.sh > session.out 2>&1 &         # survives an SSH drop
+tail -f session.out                                             # Ctrl-C stops the tail, not the job
+```
+
+The last lines show total wall-clock minutes and the tarball path. On the laptop (host and port are on the pod's Connect tab), from the repo root:
+
+```
+scp -P <port> root@<ip>:/workspace/heimdall-lora-lab/gpu_session_*.tar.gz .
+tar xzf gpu_session_*.tar.gz
+```
+
+That puts `results/` (preds, scores, `summary.md`), `logs/` and `checkpoints/lora-v1/adapter/` in place. Rerun only training after a failure: `bash scripts/gpu_session.sh --skip-baseline --skip-install`. If training finished but vLLM rejected the adapter, reuse it instead of retraining: `bash scripts/gpu_session.sh --skip-baseline --skip-install --skip-train`.
+
+**Stop the pod as soon as the scp finishes.** The script ending does not stop billing. After the session, log the total minutes x the pod's hourly rate under GPU hours / spend above.
