@@ -136,3 +136,26 @@ Deviations and things to know:
 - Several markdown files (README, report, this log, AGENTS.md) had formatter whitespace changes in the working tree that I did not make; the ones in files I edited are in the same commit.
 - GPU hours: 0; GPU spend: $0 (total $0 / $25).
 - Next: clone the repo on the GPU box, serve base Qwen with vLLM and run `run_prompted.py`, run the NeMo LoRA job on `data/nemo/`, serve the adapter and score it. Run Opus locally (needs API credit; the 2026-10-21 run failed on a low balance). Then the A/B sheet.
+
+## 2026-11-07 (Sat): Opus baseline on val
+
+Ran the prompted frontier baseline through `scripts/run_prompted.py` and scored it with `scripts/score.py` on `data/val.jsonl` (108 rows, generator target labels, used as the held-out test set).
+
+- Model `claude-opus-5-5`, `effort=low`, no temperature (Opus 5.5 rejects it), `max_tokens=2048`, `template_v1` (sha256 prefix 8e692ee4889d), repo at 532a822. One run. Output is not deterministic, so a rerun could differ by a few rows.
+- Usage and cost (from the terminal `Usage:` line): [FILL IN: requests, input tokens, output tokens, USD]. The script prints this to stderr only and does not save it, and the line was lost in a `/clear`. Copy it in from the terminal scrollback.
+- No parse failures, no cut-off or refused replies, no missing rows.
+
+Results (val, target labels, 95% Wilson intervals on accuracies):
+
+| Model | task_type acc | complexity acc | complexity macro-F1 | task_type macro-F1 | cell exact-match |
+|---|---|---|---|---|---|
+| Opus 5.5 (`effort=low`) | 1.000 [0.966, 1.000] | 0.870 [0.794, 0.921] | 0.873 | 1.000 | 94/108 (0.870) |
+
+- task_type: 108/108 correct. All 14 cell errors are complexity errors, so cell accuracy equals complexity accuracy.
+- Complexity confusion (rows true, cols predicted; low/medium/high): low 31/5/0, medium 5/31/0, high 0/4/32. All 14 errors are off by one, none off by two.
+- Borderline subset (the 21 val rows where the GPT-6 relabel disagreed with the target): complexity 12/21 (0.571 [0.365, 0.755]), task_type 21/21. This subset is 19% of val rows but holds 9 of the 14 errors. The other 87 rows have 5 errors (82/87, 0.943).
+- Errors by task type: debugging 7 (1 low, 3 medium, 3 high), data_analysis 4, research_qa 2, code_explanation_review 1. Six of the 7 are in debugging medium/high (3 of 6 correct in each cell), and 5 of those 7 are borderline rows. Not looked at row by row yet.
+- Reading it plainly: Opus gets task_type perfectly on this set and complexity to 0.87, against 0.58 for rules and 0.48 for length-only. Most of its misses are on prompts whose labels are already contested, so part of the gap to 1.0 is label noise in the target labels, not model error. Single run on 108 rows; the interval on complexity is about 8 points wide each side.
+- Files: `results/opus_val_preds.jsonl`, `results/opus_val_scores.json`, `results/summary.md` (regenerated).
+- GPU hours: 0; GPU spend: $0 (total $0 / $25). The Opus API cost is separate from the GPU budget.
+- Next: base Qwen prompted run, the NeMo LoRA job on `data/nemo/`, then the A/B sheet.
