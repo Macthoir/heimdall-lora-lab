@@ -1,0 +1,122 @@
+# LoRA fine-tune of Qwen2.5-1.5B-Instruct as the Heimdall prompt classifier.
+#
+# Written against nemo-automodel==0.7.0 (PyPI, released 2026-10-21). The keys below
+# were checked against that wheel's source (recipes/_typed_config.py, recipes/llm/train_ft.py,
+# datasets/llm/chat_dataset.py, formatting_utils.py, _peft/, checkpoint/), not run.
+# If you bump the pin in train/requirements-gpu.txt, re-check this file.
+#
+# Run (from the repo root, on the GPU box, one GPU):
+#   torchrun --standalone --nproc-per-node 1 -m nemo_automodel.cli.app train/lora_qwen25_1p5b.yaml
+# scripts/gpu_session.sh does this for you.
+#
+# Hyperparameters are fixed up front (README: nothing is tuned on val; val is the test set).
+# The task spec fixed: LoRA dim 16 / alpha 32 / dropout 0.05 on all linear layers, lr 1e-4,
+# 3 epochs, bf16, 1 GPU, seed 1. Everything else here (batch size, constant LR with no
+# warmup, AdamW weight_decay 0, grad clip 1.0 by default) is my choice, not tuned.
+
+recipe: TrainFinetuneRecipeForNextTokenPrediction
+
+seed: 1
+
+# 357 train rows. local 8 x grad-accum 2 = global batch 16 -> 23 optimizer steps per
+# epoch (the last one is a partial group), 69 steps over 3 epochs.
+# Checkpoints and validation both happen at the end of every epoch (the defaults
+# save_checkpoint_every_epoch / validate_on_checkpoint); ckpt_every_steps is set past the
+# end of training so there are no extra mid-epoch saves. val_every_steps stays unset.
+step_scheduler:
+  global_batch_size: 16
+  local_batch_size: 8
+  num_epochs: 3
+  ckpt_every_steps: 100000
+  save_checkpoint_every_epoch: true
+  validate_on_checkpoint: true
+
+dist_env:
+  backend: nccl
+  timeout_minutes: 10
+
+model:
+  _target_: nemo_automodel.NeMoAutoModelForCausalLM.from_pretrained
+  pretrained_model_name_or_path: Qwen/Qwen2.5-1.5B-Instruct
+  torch_dtype: bf16
+
+# "All linear layers" = the 7 projections in each transformer block (q, k, v, o, gate, up,
+# down). '*_proj' matches exactly those for Qwen2. match_all_linear is not used: in 0.7.0 it
+# also wraps lm_head, and the library docs warn that this breaks downstream tools (vLLM).
+peft:
+  _target_: nemo_automodel.components._peft.lora.PeftConfig
+  target_modules: ["*_proj"]
+  dim: 16
+  alpha: 32
+  dropout: 0.05
+
+distributed:
+  strategy: fsdp2
+  dp_size: none
+  tp_size: 1
+  cp_size: 1
+  sequence_parallel: false
+
+# Cross-entropy over the labels only; prompt tokens are -100 (see dataset below).
+loss_fn:
+  _target_: nemo_automodel.components.loss.masked_ce.MaskedCrossEntropy
+
+optimizer:
+  _target_: torch.optim.AdamW
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+  lr: 1.0e-4
+  weight_decay: 0
+# No lr_scheduler block: the learning rate stays constant at 1e-4.
+
+# Local chat-format JSONL, one {"messages": [system, user, assistant]} per line.
+# Loss on the assistant turn only:
+#   - answer_only_loss_mask defaults to True inside format_chat_template. Qwen2.5's chat
+#     template has no {% generation %} block, so the mask comes from prefix-length arithmetic
+#     over the template render.
+#   - that fallback also supervises the "<|im_start|>assistant\n" header, so
+#     mask_generation_prompt: true removes it. What remains supervised is the label JSON
+#     plus "<|im_end|>" (and the "\n" after it).
+# scripts/preflight_train.py --tokenizer decodes the supervised span for row 0 and fails if it
+# is anything else; gpu_session.sh runs it before training.
+# seq_length: longest train row is 1305 tokens with the Qwen2.5 tokenizer (measured; the
+# template adds nothing beyond ChatML markers when a system message is present), 1015 for
+# val. Rounded up to 1536. Truncation is on only as a bound; the preflight checks nothing is
+# near it.
+# No tokenizer block: the recipe builds the tokenizer from the model name above.
+dataset:
+  _target_: nemo_automodel.components.datasets.llm.chat_dataset.ChatDataset
+  path_or_dataset_id: data/nemo/train.jsonl
+  seq_length: 1536
+  padding: do_not_pad
+  truncation: true
+  mask_generation_prompt: true
+
+dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  collate_fn: nemo_automodel.components.datasets.utils.default_collater
+  shuffle: true
+
+# Validation loss on the same val file the README scores as the held-out test set. This is a
+# loss readout only; the final checkpoint is kept, never picked by val.
+validation_dataset:
+  _target_: nemo_automodel.components.datasets.llm.chat_dataset.ChatDataset
+  path_or_dataset_id: data/nemo/val.jsonl
+  seq_length: 1536
+  padding: do_not_pad
+  truncation: true
+  mask_generation_prompt: true
+
+validation_dataloader:
+  _target_: torchdata.stateful_dataloader.StatefulDataLoader
+  collate_fn: nemo_automodel.components.datasets.utils.default_collater
+
+# PEFT checkpoints are written as epoch_<E>_step_<S>/model/{adapter_model.safetensors,
+# adapter_config.json} (HF PEFT format) plus optimizer state. LATEST points at the last
+# epoch; LOWEST_VAL also gets written but is NOT used. gpu_session.sh copies the last
+# epoch's model/ to checkpoints/lora-v1/adapter/.
+checkpoint:
+  enabled: true
+  checkpoint_dir: checkpoints/lora-v1/
+  model_save_format: safetensors
+  save_consolidated: false
