@@ -17,7 +17,7 @@ A week-long LoRA fine-tuning exercise: a prompt **task type + complexity classif
   - `task_type`: `code_generation`, `debugging`, `code_explanation_review`, `writing_docs`, `data_analysis`, `research_qa`
   - 6 task types × 3 complexity levels = 18 combinations
 - **Why:** in Bifrost, routing (cheap model vs. strong model) and downstream batch processing / sentiment categorization both depend on knowing what a prompt is for and how hard it is.
-- **How it's judged:** against simple baselines on a hand-labeled test set, plus a 50-example human review.
+- **How it's judged:** against simple baselines on a held-out set (`data/val.jsonl`, 108 prompts), plus a 50-example human review.
 
 ## What this is not
 
@@ -27,17 +27,17 @@ A week-long LoRA fine-tuning exercise: a prompt **task type + complexity classif
 
 ## Constraints
 
-| | |
-|---|---|
-| Data | Synthetic only |
+|         |                                                                                    |
+| ------- | ---------------------------------------------------------------------------------- |
+| Data    | Synthetic only                                                                     |
 | Compute | Rented NVIDIA GPU (4090-class) for training; local machine for data, eval, serving |
-| Budget | ~$25 GPU rental |
-| Time | ~15 hours across one week |
+| Budget  | ~$25 GPU rental                                                                    |
+| Time    | ~15 hours across one week                                                          |
 
 ## Approach
 
 - **Train/val:** prompts generated for a target label (task type × complexity), with varied persona, domain, length, noise and artifact. A model from a different family relabels them. Prompts where the two labels disagree are kept out of train.
-- **Test:** a separate generation run, deduped against train, hand-labeled blind. The hand label is ground truth.
+- **Test:** `data/val.jsonl` (108 rows, 6 per cell) is the held-out test set, scored once per model, with the generator's target labels as ground truth. A separate hand-labeled test set was planned and cut for time.
 - **Comparison:** all models see the same system prompt and output format, and all are scored on the same test set. Test is scored once.
 
 Decisions and their reasons are in the run log.
@@ -62,15 +62,15 @@ Decisions and their reasons are in the run log.
 
 ## Timeline
 
-| Day | Step |
-|---|---|
-| Mon 10/19 | Lock scope, create repo and run log |
+| Day       | Step                                                                      |
+| --------- | ------------------------------------------------------------------------- |
+| Mon 10/19 | Lock scope, create repo and run log                                       |
 | Tue 10/20 | Label taxonomy, labeling guidelines, rules-only baseline, report skeleton |
-| Wed 10/21 | Generate, review, split data; score baselines |
-| Thu 10/22 | Set up NeMo, first LoRA run |
-| Fri 10/23 | Evaluate, error analysis, optional second run |
-| Sat 10/24 | Human evaluation, optional hybrid validator |
-| Sun 10/25 | Write-up, cleanup, stretch goals |
+| Wed 10/21 | Generate, review, split data; score baselines                             |
+| Thu 10/22 | Set up NeMo, first LoRA run                                               |
+| Fri 10/23 | Evaluate, error analysis, optional second run                             |
+| Sat 10/24 | Human evaluation, optional hybrid validator                               |
+| Sun 10/25 | Write-up, cleanup, stretch goals                                          |
 
 ## Results
 
@@ -83,15 +83,24 @@ _TBD. Filled in once the comparison exists._
 
 ## Docs index
 
-| Doc | Read when you need… |
-|---|---|
-| [docs/scope.md](docs/scope.md) | Scope, must-ship vs stretch, timeline |
+| Doc                                                        | Read when you need…                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------ |
+| [docs/scope.md](docs/scope.md)                             | Scope, must-ship vs stretch, timeline                  |
 | [docs/labeling-guidelines.md](docs/labeling-guidelines.md) | Label definitions, tie-break order, canonical examples |
-| [docs/run-log.md](docs/run-log.md) | Day-by-day decisions, costs, surprises |
-| [docs/report.md](docs/report.md) | The write-up (skeleton, filled in as results exist) |
-| [GLOSSARY.md](GLOSSARY.md) | What terms like cell, relabel and borderline mean here |
+| [docs/run-log.md](docs/run-log.md)                         | Day-by-day decisions, costs, surprises                 |
+| [docs/report.md](docs/report.md)                           | The write-up (skeleton, filled in as results exist)    |
+| [GLOSSARY.md](GLOSSARY.md)                                 | What terms like cell, relabel and borderline mean here |
 
 More docs (baselines, training, results, human eval) will be added under `docs/` as each step is done.
+
+## Where things live
+
+- `shared/template_v1.txt`: the one system prompt every model sees (prompted Qwen, Opus, LoRA training data)
+- `scripts/common.py`: label lists, JSONL reader, template loader, strict output parser
+- `scripts/score.py`: scores any preds file against val (`--from-rules` / `--from-length` for the baselines); writes `results/<name>_val_scores.json` and `results/summary.md`
+- `scripts/prep_nemo.py`: builds `data/nemo/{train,val}.jsonl` for NeMo (borderline ids dropped); `--format input-output` for the other shape
+- `scripts/run_prompted.py`: runs Opus (`--backend anthropic`) or a vLLM server (`--backend openai --base-url ...`) over val; resumable, `--dry-run`
+- `scripts/make_ab_sheet.py`: blind X/Y sheet for the human review; `--unblind` scores it. The key `eval/ab_key.json` is gitignored until rating is done
 
 ## Commands
 

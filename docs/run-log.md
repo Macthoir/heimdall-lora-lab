@@ -77,16 +77,17 @@ Newest entry at the bottom. One entry per working session: what was done, decisi
 - Length check (train + val): median words by complexity are low 66, medium 96, high 121, with heavily overlapping ranges. The generator's `length` axis is spread evenly across complexity. Length is a weak shortcut, so a length-only baseline is added as a sanity check.
 - GPU spend: $0 (total $0 / $25).
 - Next: score the rules baseline on val, then the length-only baseline.
+
 ## 2026-10-24 (Sat): baselines on val
 
 - Scored two baselines on `data/val.jsonl` (108 rows, target labels). Val only; `data/test.jsonl` was not read. Rules were not edited or tuned this session, so this is the untuned `rules-v1` rules at git SHA 4087228 (`baselines/rules.py` unchanged since that commit). The `rules-v1` tag is not created yet.
 - Added `baselines/length_only.py` and `tests/test_length_only.py`: complexity from word count alone, two thresholds fitted on `data/train.jsonl` only (grid search over observed counts, ties go to lower thresholds). Fitted t1=57, t2=108 words, train accuracy 0.484. Thresholds saved to `results/length_only_thresholds.json`. These two files are not committed yet.
 - Results on val (target labels). Single 108-row run with no intervals, so a few points of difference is noise.
 
-| Baseline | task_type acc | task_type macro-F1 | complexity acc | complexity macro-F1 | cell exact-match |
-|---|---|---|---|---|---|
-| Length-only | n/a | n/a | 0.4815 | 0.4779 | n/a |
-| Rules (`rules-v1`) | 0.4259 | 0.3807 | 0.5833 | 0.5939 | 23/108 (0.213) |
+| Baseline           | task_type acc | task_type macro-F1 | complexity acc | complexity macro-F1 | cell exact-match |
+| ------------------ | ------------- | ------------------ | -------------- | ------------------- | ---------------- |
+| Length-only        | n/a           | n/a                | 0.4815         | 0.4779              | n/a              |
+| Rules (`rules-v1`) | 0.4259        | 0.3807             | 0.5833         | 0.5939              | 23/108 (0.213)   |
 
 - Rules, complexity confusion (rows true, cols predicted; low/medium/high): low 22/14/0, medium 12/20/4, high 2/13/21. Only 2 errors are off by two levels; the rest are adjacent. Medium has the lowest F1 (0.482).
 - Rules, task_type: debugging is the only strong class (17 of 18 correct, F1 0.63). code_generation (11 of 18), code_explanation_review (8 of 18) and data_analysis (7 of 18) mostly fall through to the `research_qa` default, which means the keyword patterns miss most of those prompts. Left as is; fixing it means tuning on val, which would be a new rules version.
@@ -95,3 +96,43 @@ Newest entry at the bottom. One entry per working session: what was done, decisi
 - GPU hours: 0; GPU spend: $0 (total $0 / $25).
 - Froze `rules-v1`: annotated local tag at commit 4087228 covering `baselines/rules.py`, `tests/test_rules.py` and `docs/labeling-guidelines.md`. All three were unchanged since the first commit (c69b5b4) and `tests/test_rules.py` passes. The tag message records their blob ids and the val numbers above. Not pushed. Any later change to these files is a new version (`rules-v2`), not an edit.
 - Next: Day 4, the LoRA run. `baselines/length_only.py`, its tests and this log are still uncommitted.
+
+## 2026-11-07 (Sat): Day 4 prep
+
+Glue scripts only. No training, no GPU, no paid API calls (Opus and Qwen were not run; the API paths were tested with mocked clients and `--dry-run`).
+
+Decisions:
+
+- **No new test set.** `data/val.jsonl` (108 rows, 6 per cell) is the held-out test set. It was never used for tuning (`rules-v1` was frozen untuned). Every model is scored on it once. This deviates from `docs/report.md`'s plan (separate 180-prompt hand-labeled set); noted in the report's Limitations. Ground truth is the generator's target labels, not hand labels. The GPT-6 relabel disagrees on 21 of the 108 rows (the borderline subset).
+- **Nothing is tuned on val from here on.** The 2026-10-20 rule "tune rules, template and hyperparameters on val only" no longer applies, since val is the test set. `rules-v1`, `template_v1` and the LoRA hyperparameters are fixed before scoring. `rules-v1` and the length-only baseline had already been scored on val on 2026-10-24; score.py re-scores the same frozen code and gets the same numbers, no new look.
+- **Frontier baseline is Opus 5.5 only** (`claude-opus-5-5`). GPT-6 is cut: it relabeled the data, so it would be a biased judge.
+- **Stretch cut:** second run, second rater, hybrid validator, GGUF/Ollama.
+- **Val is also the loss-monitoring file for training** (`data/nemo/val.jsonl`). Using it for loss and as the test set is a minor leak. Checkpoints are not picked by val accuracy; the final one is used.
+
+Built:
+
+- `shared/template_v1.txt`: system prompt for every model. One-line definitions from the guidelines, the effort-not-length complexity rule, "pick the lower level when unsure", JSON-only output. Differences from the bare spec: task types are listed in the tie-break order with a one-line tie-break and main-rule sentence; "or large context" is dropped from the `high` definition because it conflicts with "pasted logs don't raise it"; the output example is the compact form the training targets use. 1,353 characters, about 330-350 tokens by estimate (no tokenizer installed, not measured). Not tagged `template-v1` yet.
+- `scripts/common.py`, `scripts/score.py`, `scripts/prep_nemo.py`, `scripts/run_prompted.py`, `scripts/make_ab_sheet.py`, with tests (`pytest`: 106 pass; frozen `rules-v1` files untouched).
+- `data/nemo/train.jsonl` (357 rows) and `val.jsonl` (87 rows), chat format. Borderline ids are dropped from both: 75 of 432 train, 21 of 108 val. Smallest train cell is writing_docs/medium with 8 rows; others range 16 to 24. Smallest val cell has 2 rows (debugging/medium, data_analysis/medium).
+- `eval/ab_key.json` is in `.gitignore` until rating is finished.
+
+Reproduced with `score.py` (val, target labels), matching the 2026-10-24 entry:
+
+| Model | task_type acc | complexity acc | complexity macro-F1 | task_type macro-F1 | cell exact-match |
+|---|---|---|---|---|---|
+| Rules (`rules-v1`) | 0.4259 [0.337, 0.520] | 0.5833 [0.489, 0.672] | 0.5939 | 0.3807 | 23/108 (0.213) |
+| Length-only (t1=57, t2=108) | n/a | 0.4815 [0.390, 0.575] | 0.4779 | n/a | n/a |
+
+- Rules complexity errors: 45, of which 43 off by one and 2 off by two. Length-only: 56 errors, 44 off by one and 12 off by two.
+- Borderline subset (21 val rows): rules task 10/21, complexity 9/21, cell 2/21; length-only complexity 9/21.
+- The old `results/length_only_val_preds.jsonl` was UTF-16 (shell redirect); score.py regenerated it as UTF-8. Rules preds are identical to the earlier file.
+
+Deviations and things to know:
+
+- **Opus request settings differ from "temperature 0, max_tokens 64".** The API docs say Opus 5.5 rejects `temperature` (400) and always thinks, with thinking counted against `max_tokens`. The anthropic backend therefore sends no temperature, `effort=low` (`--effort` to change), and `max_tokens=2048`. The openai/vLLM backend keeps temperature 0 and max_tokens 64. Opus output is not guaranteed deterministic. Cut-off or refused replies count as parse failures and are reported at the end of a run.
+- The openai backend requires `--base-url`, so it can't hit the paid OpenAI API by accident.
+- Macro-F1 averages over the labels present in the gold rows scored. Wilson intervals are on accuracies only; macro-F1 has none, so the Results note in `docs/report.md` was changed to say that.
+- A/B sheet: the 50 rows are chosen borderline-first, then random; the sheet keeps that order. If fewer than 50 differ, all are taken and the script says so.
+- Several markdown files (README, report, this log, AGENTS.md) had formatter whitespace changes in the working tree that I did not make; the ones in files I edited are in the same commit.
+- GPU hours: 0; GPU spend: $0 (total $0 / $25).
+- Next: clone the repo on the GPU box, serve base Qwen with vLLM and run `run_prompted.py`, run the NeMo LoRA job on `data/nemo/`, serve the adapter and score it. Run Opus locally (needs API credit; the 2026-10-21 run failed on a low balance). Then the A/B sheet.
