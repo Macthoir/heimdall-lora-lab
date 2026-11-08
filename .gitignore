@@ -62,3 +62,9 @@ results/
 
 # Blind A/B key: stays local until human rating is finished
 eval/ab_key.json
+
+# GPU session outputs (scripts/gpu_session.sh): logs, checkpoints, the venv, the tarball
+logs/
+checkpoints/
+.venv-gpu/
+gpu_session_*.tar.gz
