@@ -59,3 +59,6 @@ dmypy.json
 *.log
 # Generated eval outputs; reproducible from the commands in the README
 results/
+
+# Blind A/B key: stays local until human rating is finished
+eval/ab_key.json
