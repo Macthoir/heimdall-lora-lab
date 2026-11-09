@@ -1,0 +1,7 @@
+{
+  "t1": 57,
+  "t2": 108,
+  "train_accuracy": 0.4837962962962963,
+  "fit_file": "data/train.jsonl",
+  "n_fit": 432
+}

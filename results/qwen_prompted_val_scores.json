@@ -1,0 +1,532 @@
+{
+  "name": "qwen_prompted",
+  "gold": "data/val.jsonl",
+  "preds": "results/qwen_prompted_val_preds.jsonl",
+  "git_sha": "0ab7f3a",
+  "template_sha256_12": "8e692ee4889d",
+  "all": {
+    "n": 108,
+    "missing": 0,
+    "parse_failures": 2,
+    "task_na": false,
+    "complexity": {
+      "correct": 47,
+      "n": 108,
+      "acc": 0.4351851851851852,
+      "wilson95": [
+        0.3455010983543914,
+        0.5293217075386807
+      ],
+      "macro_f1": 0.3785935426802299,
+      "confusion": {
+        "low": {
+          "low": 15,
+          "medium": 19,
+          "high": 0,
+          "invalid": 2
+        },
+        "medium": {
+          "low": 6,
+          "medium": 30,
+          "high": 0,
+          "invalid": 0
+        },
+        "high": {
+          "low": 0,
+          "medium": 34,
+          "high": 2,
+          "invalid": 0
+        }
+      },
+      "errors": 61,
+      "errors_with_valid_pred": 59,
+      "off_by_one": 59,
+      "off_by_two": 0,
+      "off_by_one_rate": 1.0
+    },
+    "task_type": {
+      "correct": 69,
+      "n": 108,
+      "acc": 0.6388888888888888,
+      "wilson95": [
+        0.5449722923436943,
+        0.7232645521711508
+      ],
+      "macro_f1": 0.6429258863550815,
+      "confusion": {
+        "code_generation": {
+          "code_generation": 7,
+          "debugging": 0,
+          "code_explanation_review": 10,
+          "writing_docs": 0,
+          "data_analysis": 0,
+          "research_qa": 0,
+          "invalid": 1
+        },
+        "debugging": {
+          "code_generation": 0,
+          "debugging": 15,
+          "code_explanation_review": 3,
+          "writing_docs": 0,
+          "data_analysis": 0,
+          "research_qa": 0,
+          "invalid": 0
+        },
+        "code_explanation_review": {
+          "code_generation": 0,
+          "debugging": 1,
+          "code_explanation_review": 17,
+          "writing_docs": 0,
+          "data_analysis": 0,
+          "research_qa": 0,
+          "invalid": 0
+        },
+        "writing_docs": {
+          "code_generation": 0,
+          "debugging": 0,
+          "code_explanation_review": 4,
+          "writing_docs": 13,
+          "data_analysis": 0,
+          "research_qa": 0,
+          "invalid": 1
+        },
+        "data_analysis": {
+          "code_generation": 1,
+          "debugging": 4,
+          "code_explanation_review": 2,
+          "writing_docs": 0,
+          "data_analysis": 10,
+          "research_qa": 1,
+          "invalid": 0
+        },
+        "research_qa": {
+          "code_generation": 0,
+          "debugging": 2,
+          "code_explanation_review": 5,
+          "writing_docs": 3,
+          "data_analysis": 1,
+          "research_qa": 7,
+          "invalid": 0
+        }
+      }
+    },
+    "cell": {
+      "correct": 24,
+      "n": 108,
+      "acc": 0.2222222222222222,
+      "wilson95": [
+        0.15412547066351984,
+        0.3094008403067896
+      ]
+    },
+    "per_cell": [
+      {
+        "task_type": "code_generation",
+        "complexity": "low",
+        "n": 6,
+        "cell_correct": 0,
+        "task_correct": 2,
+        "complexity_correct": 1
+      },
+      {
+        "task_type": "code_generation",
+        "complexity": "medium",
+        "n": 6,
+        "cell_correct": 2,
+        "task_correct": 2,
+        "complexity_correct": 6
+      },
+      {
+        "task_type": "code_generation",
+        "complexity": "high",
+        "n": 6,
+        "cell_correct": 1,
+        "task_correct": 3,
+        "complexity_correct": 2
+      },
+      {
+        "task_type": "debugging",
+        "complexity": "low",
+        "n": 6,
+        "cell_correct": 2,
+        "task_correct": 5,
+        "complexity_correct": 2
+      },
+      {
+        "task_type": "debugging",
+        "complexity": "medium",
+        "n": 6,
+        "cell_correct": 3,
+        "task_correct": 4,
+        "complexity_correct": 5
+      },
+      {
+        "task_type": "debugging",
+        "complexity": "high",
+        "n": 6,
+        "cell_correct": 0,
+        "task_correct": 6,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "code_explanation_review",
+        "complexity": "low",
+        "n": 6,
+        "cell_correct": 3,
+        "task_correct": 6,
+        "complexity_correct": 3
+      },
+      {
+        "task_type": "code_explanation_review",
+        "complexity": "medium",
+        "n": 6,
+        "cell_correct": 4,
+        "task_correct": 6,
+        "complexity_correct": 4
+      },
+      {
+        "task_type": "code_explanation_review",
+        "complexity": "high",
+        "n": 6,
+        "cell_correct": 0,
+        "task_correct": 5,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "writing_docs",
+        "complexity": "low",
+        "n": 6,
+        "cell_correct": 2,
+        "task_correct": 3,
+        "complexity_correct": 3
+      },
+      {
+        "task_type": "writing_docs",
+        "complexity": "medium",
+        "n": 6,
+        "cell_correct": 4,
+        "task_correct": 4,
+        "complexity_correct": 6
+      },
+      {
+        "task_type": "writing_docs",
+        "complexity": "high",
+        "n": 6,
+        "cell_correct": 0,
+        "task_correct": 6,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "data_analysis",
+        "complexity": "low",
+        "n": 6,
+        "cell_correct": 0,
+        "task_correct": 2,
+        "complexity_correct": 3
+      },
+      {
+        "task_type": "data_analysis",
+        "complexity": "medium",
+        "n": 6,
+        "cell_correct": 2,
+        "task_correct": 3,
+        "complexity_correct": 5
+      },
+      {
+        "task_type": "data_analysis",
+        "complexity": "high",
+        "n": 6,
+        "cell_correct": 0,
+        "task_correct": 5,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "research_qa",
+        "complexity": "low",
+        "n": 6,
+        "cell_correct": 0,
+        "task_correct": 1,
+        "complexity_correct": 3
+      },
+      {
+        "task_type": "research_qa",
+        "complexity": "medium",
+        "n": 6,
+        "cell_correct": 1,
+        "task_correct": 1,
+        "complexity_correct": 4
+      },
+      {
+        "task_type": "research_qa",
+        "complexity": "high",
+        "n": 6,
+        "cell_correct": 0,
+        "task_correct": 5,
+        "complexity_correct": 0
+      }
+    ]
+  },
+  "borderline_subset": {
+    "n": 21,
+    "missing": 0,
+    "parse_failures": 0,
+    "task_na": false,
+    "complexity": {
+      "correct": 10,
+      "n": 21,
+      "acc": 0.47619047619047616,
+      "wilson95": [
+        0.2834400610153417,
+        0.6763046541715557
+      ],
+      "macro_f1": 0.3021346469622332,
+      "confusion": {
+        "low": {
+          "low": 1,
+          "medium": 3,
+          "high": 0,
+          "invalid": 0
+        },
+        "medium": {
+          "low": 2,
+          "medium": 9,
+          "high": 0,
+          "invalid": 0
+        },
+        "high": {
+          "low": 0,
+          "medium": 6,
+          "high": 0,
+          "invalid": 0
+        }
+      },
+      "errors": 11,
+      "errors_with_valid_pred": 11,
+      "off_by_one": 11,
+      "off_by_two": 0,
+      "off_by_one_rate": 1.0
+    },
+    "task_type": {
+      "correct": 13,
+      "n": 21,
+      "acc": 0.6190476190476191,
+      "wilson95": [
+        0.4087865377511576,
+        0.7924898863143551
+      ],
+      "macro_f1": 0.5397435897435898,
+      "confusion": {
+        "code_generation": {
+          "code_generation": 1,
+          "debugging": 0,
+          "code_explanation_review": 1,
+          "writing_docs": 0,
+          "data_analysis": 0,
+          "research_qa": 0,
+          "invalid": 0
+        },
+        "debugging": {
+          "code_generation": 0,
+          "debugging": 5,
+          "code_explanation_review": 2,
+          "writing_docs": 0,
+          "data_analysis": 0,
+          "research_qa": 0,
+          "invalid": 0
+        },
+        "code_explanation_review": {
+          "code_generation": 0,
+          "debugging": 0,
+          "code_explanation_review": 4,
+          "writing_docs": 0,
+          "data_analysis": 0,
+          "research_qa": 0,
+          "invalid": 0
+        },
+        "writing_docs": {
+          "code_generation": 0,
+          "debugging": 0,
+          "code_explanation_review": 0,
+          "writing_docs": 0,
+          "data_analysis": 0,
+          "research_qa": 0,
+          "invalid": 0
+        },
+        "data_analysis": {
+          "code_generation": 0,
+          "debugging": 2,
+          "code_explanation_review": 0,
+          "writing_docs": 0,
+          "data_analysis": 3,
+          "research_qa": 0,
+          "invalid": 0
+        },
+        "research_qa": {
+          "code_generation": 0,
+          "debugging": 1,
+          "code_explanation_review": 2,
+          "writing_docs": 0,
+          "data_analysis": 0,
+          "research_qa": 0,
+          "invalid": 0
+        }
+      }
+    },
+    "cell": {
+      "correct": 3,
+      "n": 21,
+      "acc": 0.14285714285714285,
+      "wilson95": [
+        0.04981012499725268,
+        0.34636060280620945
+      ]
+    },
+    "per_cell": [
+      {
+        "task_type": "code_generation",
+        "complexity": "low",
+        "n": 1,
+        "cell_correct": 0,
+        "task_correct": 0,
+        "complexity_correct": 1
+      },
+      {
+        "task_type": "code_generation",
+        "complexity": "medium",
+        "n": 0,
+        "cell_correct": 0,
+        "task_correct": 0,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "code_generation",
+        "complexity": "high",
+        "n": 1,
+        "cell_correct": 0,
+        "task_correct": 1,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "debugging",
+        "complexity": "low",
+        "n": 0,
+        "cell_correct": 0,
+        "task_correct": 0,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "debugging",
+        "complexity": "medium",
+        "n": 4,
+        "cell_correct": 2,
+        "task_correct": 2,
+        "complexity_correct": 4
+      },
+      {
+        "task_type": "debugging",
+        "complexity": "high",
+        "n": 3,
+        "cell_correct": 0,
+        "task_correct": 3,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "code_explanation_review",
+        "complexity": "low",
+        "n": 2,
+        "cell_correct": 0,
+        "task_correct": 2,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "code_explanation_review",
+        "complexity": "medium",
+        "n": 1,
+        "cell_correct": 0,
+        "task_correct": 1,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "code_explanation_review",
+        "complexity": "high",
+        "n": 1,
+        "cell_correct": 0,
+        "task_correct": 1,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "writing_docs",
+        "complexity": "low",
+        "n": 0,
+        "cell_correct": 0,
+        "task_correct": 0,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "writing_docs",
+        "complexity": "medium",
+        "n": 0,
+        "cell_correct": 0,
+        "task_correct": 0,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "writing_docs",
+        "complexity": "high",
+        "n": 0,
+        "cell_correct": 0,
+        "task_correct": 0,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "data_analysis",
+        "complexity": "low",
+        "n": 0,
+        "cell_correct": 0,
+        "task_correct": 0,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "data_analysis",
+        "complexity": "medium",
+        "n": 4,
+        "cell_correct": 1,
+        "task_correct": 2,
+        "complexity_correct": 3
+      },
+      {
+        "task_type": "data_analysis",
+        "complexity": "high",
+        "n": 1,
+        "cell_correct": 0,
+        "task_correct": 1,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "research_qa",
+        "complexity": "low",
+        "n": 1,
+        "cell_correct": 0,
+        "task_correct": 0,
+        "complexity_correct": 0
+      },
+      {
+        "task_type": "research_qa",
+        "complexity": "medium",
+        "n": 2,
+        "cell_correct": 0,
+        "task_correct": 0,
+        "complexity_correct": 2
+      },
+      {
+        "task_type": "research_qa",
+        "complexity": "high",
+        "n": 0,
+        "cell_correct": 0,
+        "task_correct": 0,
+        "complexity_correct": 0
+      }
+    ]
+  },
+  "borderline_n": 21
+}

@@ -1,0 +1,102 @@
+{
+  "name": "length_only",
+  "gold": "data/val.jsonl",
+  "preds": "C:\\Users\\Connor\\Documents\\Claude Code Playground\\heimdall-lora-lab\\results\\length_only_val_preds.jsonl",
+  "git_sha": "f38e385",
+  "template_sha256_12": "8e692ee4889d",
+  "all": {
+    "n": 108,
+    "missing": 0,
+    "parse_failures": 0,
+    "task_na": true,
+    "complexity": {
+      "correct": 52,
+      "n": 108,
+      "acc": 0.48148148148148145,
+      "wilson95": [
+        0.38951373394028815,
+        0.5747213534577322
+      ],
+      "macro_f1": 0.4778606489449863,
+      "confusion": {
+        "low": {
+          "low": 16,
+          "medium": 11,
+          "high": 9,
+          "invalid": 0
+        },
+        "medium": {
+          "low": 8,
+          "medium": 13,
+          "high": 15,
+          "invalid": 0
+        },
+        "high": {
+          "low": 3,
+          "medium": 10,
+          "high": 23,
+          "invalid": 0
+        }
+      },
+      "errors": 56,
+      "errors_with_valid_pred": 56,
+      "off_by_one": 44,
+      "off_by_two": 12,
+      "off_by_one_rate": 0.7857142857142857
+    },
+    "task_type": null,
+    "cell": null,
+    "per_cell": null
+  },
+  "borderline_subset": {
+    "n": 21,
+    "missing": 0,
+    "parse_failures": 0,
+    "task_na": true,
+    "complexity": {
+      "correct": 9,
+      "n": 21,
+      "acc": 0.42857142857142855,
+      "wilson95": [
+        0.2446996892537596,
+        0.6345344563069328
+      ],
+      "macro_f1": 0.4232064232064232,
+      "confusion": {
+        "low": {
+          "low": 2,
+          "medium": 0,
+          "high": 2,
+          "invalid": 0
+        },
+        "medium": {
+          "low": 5,
+          "medium": 4,
+          "high": 2,
+          "invalid": 0
+        },
+        "high": {
+          "low": 0,
+          "medium": 3,
+          "high": 3,
+          "invalid": 0
+        }
+      },
+      "errors": 12,
+      "errors_with_valid_pred": 12,
+      "off_by_one": 10,
+      "off_by_two": 2,
+      "off_by_one_rate": 0.8333333333333334
+    },
+    "task_type": null,
+    "cell": null,
+    "per_cell": null
+  },
+  "borderline_n": 21,
+  "length_fit": {
+    "t1": 57,
+    "t2": 108,
+    "train_accuracy": 0.4837962962962963,
+    "fit_file": "C:\\Users\\Connor\\Documents\\Claude Code Playground\\heimdall-lora-lab\\data\\train.jsonl"
+  }
+}
