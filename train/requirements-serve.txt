@@ -1,0 +1,6 @@
+# Serving venv (.venv-serve): scripts/gpu_session.sh steps c and e (vllm serve), run_prompted.py
+# (openai client) and score.py. Python 3.11+.
+#   vllm 0.32.0 (2026-10-18): torch==2.13.0, transformers>=5.16.1,<5.20.0, quack-kernels==0.6.5
+# Kept apart from nemo-automodel (train/requirements-train.txt): see the note there.
+vllm==0.32.0
+openai

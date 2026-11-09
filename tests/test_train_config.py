@@ -21,7 +21,8 @@ except ImportError:
     yaml = None
 
 CONFIG = REPO / "train" / "lora_qwen25_1p5b.yaml"
-REQUIREMENTS = REPO / "train" / "requirements-gpu.txt"
+REQUIREMENTS = REPO / "train" / "requirements-train.txt"
+SERVE_REQUIREMENTS = REPO / "train" / "requirements-serve.txt"
 
 
 @unittest.skipIf(yaml is None, "PyYAML not installed")
@@ -75,6 +76,14 @@ class TrainConfig(unittest.TestCase):
         pin = re.search(r"^nemo-automodel==(\S+)", REQUIREMENTS.read_text(encoding="utf-8"), re.M)
         self.assertIsNotNone(pin)
         self.assertIn(f"nemo-automodel=={pin.group(1)}", CONFIG.read_text(encoding="utf-8"))
+
+    def test_vllm_and_nemo_are_in_separate_venvs(self):
+        # vllm 0.32.0 and nemo-automodel 0.7.0 pin different quack-kernels; one venv is unsatisfiable.
+        train = REQUIREMENTS.read_text(encoding="utf-8")
+        serve = SERVE_REQUIREMENTS.read_text(encoding="utf-8")
+        self.assertIsNone(re.search(r"^vllm", train, re.M))
+        self.assertIsNone(re.search(r"^nemo-automodel", serve, re.M))
+        self.assertIsNotNone(re.search(r"^vllm==", serve, re.M))
 
 
 class NemoChatFiles(unittest.TestCase):

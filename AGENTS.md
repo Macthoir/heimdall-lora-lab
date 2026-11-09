@@ -7,12 +7,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **heimdall-lora-lab**: a one-week exercise to fine-tune **Qwen2.5-1.5B-Instruct** with LoRA (NVIDIA NeMo) to classify LLM gateway prompts as `{task_type, complexity}`.
 
 The classifier serves the Bifrost LLM/MCP gateway in two ways:
+
 - **Routing:** complexity informs which model tier a prompt goes to.
 - **Attribution:** it is the Tier 2 batch classifier in the productivity attribution framework, feeding batch processing and sentiment categorization.
 
 This is a homelab portfolio project. Write docs and commit messages plainly. Never describe it as production-grade or overstate results.
 
 **Label space:** 6 task types × 3 complexity levels = 18 combinations.
+
 - `task_type`: `code_generation`, `debugging`, `code_explanation_review`, `writing_docs`, `data_analysis`, `research_qa`
 - `complexity`: `low`, `medium`, `high`
 
@@ -42,16 +44,19 @@ This is a homelab portfolio project. Write docs and commit messages plainly. Nev
 ## Commands
 
 Run the test suite:
+
 ```
 python -m unittest tests/test_rules.py
 ```
 
 Run a single test:
+
 ```
 python -m unittest tests.test_rules.GuidelineExamples.test_task_type_examples
 ```
 
 Score the rules baseline against a JSONL file:
+
 ```
 python baselines/rules.py data/test.jsonl > results/rules_preds.jsonl
 ```
@@ -59,6 +64,7 @@ python baselines/rules.py data/test.jsonl > results/rules_preds.jsonl
 ## Architecture
 
 **Comparisons being tracked** (in order):
+
 1. Rules-only baseline (`baselines/rules.py`)
 2. Prompted base model (Qwen2.5-1.5B-Instruct, no fine-tune)
 3. Prompted frontier model

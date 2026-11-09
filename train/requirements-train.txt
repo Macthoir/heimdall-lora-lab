@@ -1,0 +1,8 @@
+# Training venv (.venv-train): scripts/gpu_session.sh steps b (preflight) and d (train). Python 3.11+.
+# Checked against PyPI metadata, not installed:
+#   nemo-automodel 0.7.0 (2026-10-21): torch>=2.8.0, transformers==5.18.0, quack-kernels==0.6.4 (linux)
+# vLLM is in its own venv (train/requirements-serve.txt). vllm 0.32.0 pins quack-kernels==0.6.5, so
+# the two cannot share one environment: uv refused the single-venv install on the pod (2026-11-09).
+nemo-automodel==0.7.0
+transformers==5.18.0
+pyyaml

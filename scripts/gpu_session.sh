@@ -7,7 +7,9 @@
 #
 # Steps, in order. Each logs to logs/<step>.log and the script stops on the first error:
 #   a. nvidia-smi, start the wall-clock timer
-#   b. install train/requirements-gpu.txt into .venv-gpu (uv), then check torch sees the GPU
+#   b. install train/requirements-train.txt into .venv-train and train/requirements-serve.txt into
+#      .venv-serve (uv; nemo-automodel and vllm pin different quack-kernels, so they cannot share a venv),
+#      then check torch sees the GPU in both
 #      (+ preflight: token lengths and the loss mask, on the real tokenizer and ChatDataset)
 #   c. serve base Qwen with vLLM, run scripts/run_prompted.py --name qwen_prompted, stop the server
 #   d. train the LoRA (time-boxed; on failure it stops and says so, the PEFT fallback is your call)
@@ -20,7 +22,7 @@
 #   --skip-baseline   skip step c (rerun just training)
 #   --skip-train      skip step d and reuse checkpoints/lora-v1/adapter (rerun just e-g, e.g. after vLLM
 #                     rejected the adapter); does not retrain
-#   --skip-install    skip the install in step b if .venv-gpu is already set up (still verifies it)
+#   --skip-install    skip the install in step b if both venvs are already set up (still verifies them)
 #   --allow-rescore   allow training/scoring again after results/lora_val_scores.json exists.
 #                     Val is the held-out test set and is meant to be scored once per model:
 #                     only use this for an infrastructure failure, never to chase a better number.
@@ -51,8 +53,11 @@ for arg in "$@"; do
 done
 
 TRAIN_TIMEOUT_MIN="${TRAIN_TIMEOUT_MIN:-45}"
-VENV="$REPO/.venv-gpu"
-VPY="$VENV/bin/python"
+# Two venvs: NeMo AutoModel (training, preflight) and vLLM (serving, run_prompted, score).
+TRAIN_VENV="$REPO/.venv-train"
+TRAIN_PY="$TRAIN_VENV/bin/python"
+SERVE_VENV="$REPO/.venv-serve"
+SERVE_PY="$SERVE_VENV/bin/python"
 PORT=8000
 BASE_URL="http://localhost:$PORT/v1"
 BASE_MODEL="Qwen/Qwen2.5-1.5B-Instruct"
@@ -66,7 +71,7 @@ TARBALL="$REPO/gpu_session_$STAMP.tar.gz"
 VLLM_BASE_ARGS=("$BASE_MODEL" --max-model-len 4096 --gpu-memory-utilization 0.85 --seed 1)
 VLLM_LORA_ARGS=("$BASE_MODEL" --max-model-len 4096 --gpu-memory-utilization 0.85 --seed 1
                 --enable-lora --max-lora-rank 16 --lora-modules "lora=$REPO/$ADAPTER_DIR")
-TRAIN_CMD=("$VENV/bin/torchrun" --standalone --nproc-per-node 1 -m nemo_automodel.cli.app "$CONFIG")
+TRAIN_CMD=("$TRAIN_VENV/bin/torchrun" --standalone --nproc-per-node 1 -m nemo_automodel.cli.app "$CONFIG")
 POD_TOOLS="nvidia-smi python3 curl tar timeout setsid awk grep"
 
 export PYTHONUNBUFFERED=1
@@ -126,7 +131,9 @@ trap 'fail "interrupted"' INT TERM
 # Returns the command's own exit status (pipefail), so callers can use `if ! run_step ...`.
 run_step() {
   local name="$1"; shift
-  { echo "+ $*"; "$@"; } 2>&1 | tee "logs/$name.log"
+  # trap - ERR: with set -E the left side of the pipe (a subshell) inherits the ERR trap, so a failure
+  # used to run fail() twice: once in the subshell and once for the pipeline in the main shell.
+  { trap - ERR; echo "+ $*"; "$@"; } 2>&1 | tee "logs/$name.log"
 }
 
 wait_gpu_free() {
@@ -143,7 +150,7 @@ wait_gpu_free() {
 start_server() { # start_server <log name> <vllm serve args...>
   local name="$1"; shift
   say "starting vLLM: vllm serve $*"
-  setsid "$VENV/bin/vllm" serve "$@" --port "$PORT" > "logs/$name.log" 2>&1 &
+  setsid "$SERVE_VENV/bin/vllm" serve "$@" --port "$PORT" > "logs/$name.log" 2>&1 &
   SERVER_PID=$!
   local i
   for i in $(seq 1 180); do  # up to 15 min: first run downloads the model and captures CUDA graphs
@@ -167,7 +174,7 @@ check_preds() { # check_preds <name>: every val row must have a prediction
 }
 
 run_prompted() { # run_prompted <name> <model id served by vLLM>
-  run_step "run_$1" "$VPY" scripts/run_prompted.py --backend openai --base-url "$BASE_URL" \
+  run_step "run_$1" "$SERVE_PY" scripts/run_prompted.py --backend openai --base-url "$BASE_URL" \
     --model "$2" --name "$1" --data data/val.jsonl
   check_preds "$1"
 }
@@ -184,7 +191,7 @@ dry_run() {
   say "dry run: no GPU, nothing is installed, started or sent"
   echo "repo: $REPO   python: $CHECK_PY"
   echo "checking paths"
-  for f in "$CONFIG" train/requirements-gpu.txt shared/template_v1.txt data/val.jsonl \
+  for f in "$CONFIG" train/requirements-train.txt train/requirements-serve.txt shared/template_v1.txt data/val.jsonl \
            data/nemo/train.jsonl data/nemo/val.jsonl scripts/common.py scripts/run_prompted.py \
            scripts/score.py scripts/preflight_train.py; do
     if [ -f "$f" ]; then ok "$f"; else bad "missing: $f"; fi
@@ -215,13 +222,14 @@ dry_run() {
   echo
   echo "plan (what a real run executes, in order):"
   echo "  a. nvidia-smi; timer starts"
-  echo "  b. uv venv $VENV; uv pip install -r train/requirements-gpu.txt; check torch.cuda; then"
-  echo "     $VPY scripts/preflight_train.py --tokenizer"
+  echo "  b. uv venv $TRAIN_VENV; uv pip install -r train/requirements-train.txt"
+  echo "     uv venv $SERVE_VENV; uv pip install -r train/requirements-serve.txt; check torch.cuda in both; then"
+  echo "     $TRAIN_PY scripts/preflight_train.py --tokenizer"
   if [ "$SKIP_BASELINE" = 1 ]; then
     echo "  c. SKIPPED (--skip-baseline)"
   else
     echo "  c. vllm serve $(quoted "${VLLM_BASE_ARGS[@]}" --port "$PORT")"
-    echo "     $VPY scripts/run_prompted.py --backend openai --base-url $BASE_URL --model $BASE_MODEL --name qwen_prompted --data data/val.jsonl"
+    echo "     $SERVE_PY scripts/run_prompted.py --backend openai --base-url $BASE_URL --model $BASE_MODEL --name qwen_prompted --data data/val.jsonl"
     echo "     stop the server, wait for the GPU to free"
   fi
   if [ "$SKIP_TRAIN" = 1 ]; then
@@ -231,7 +239,7 @@ dry_run() {
     echo "     then copy the last epoch's model/ to $ADAPTER_DIR"
   fi
   echo "  e. vllm serve $(quoted "${VLLM_LORA_ARGS[@]}" --port "$PORT")"
-  echo "     $VPY scripts/run_prompted.py --backend openai --base-url $BASE_URL --model lora --name lora --data data/val.jsonl"
+  echo "     $SERVE_PY scripts/run_prompted.py --backend openai --base-url $BASE_URL --model lora --name lora --data data/val.jsonl"
   echo "  f. score.py for qwen_prompted and lora; print results/summary.md and total minutes"
   echo "  g. tar results/ logs/ $ADAPTER_DIR (+ training.jsonl, validation.jsonl) -> gpu_session_<stamp>.tar.gz"
   echo
@@ -262,26 +270,37 @@ CURRENT_STEP="b: install"
 say "b. install"
 if [ "$SKIP_INSTALL" = 0 ]; then
   if ! command -v uv > /dev/null; then run_step 02_install_uv python3 -m pip install -q uv; fi
-  if [ ! -x "$VPY" ]; then run_step 02_venv uv venv --python ">=3.11" "$VENV"; fi
-  run_step 02_install uv pip install --python "$VPY" -r train/requirements-gpu.txt
-  uv pip freeze --python "$VPY" > logs/pip_freeze.txt
+  CURRENT_STEP="b: install (train venv)"
+  if [ ! -x "$TRAIN_PY" ]; then run_step 02_venv_train uv venv --python ">=3.11" "$TRAIN_VENV"; fi
+  run_step 02_install_train uv pip install --python "$TRAIN_PY" -r train/requirements-train.txt
+  uv pip freeze --python "$TRAIN_PY" > logs/pip_freeze_train.txt
+  CURRENT_STEP="b: install (serve venv)"
+  if [ ! -x "$SERVE_PY" ]; then run_step 02_venv_serve uv venv --python ">=3.11" "$SERVE_VENV"; fi
+  run_step 02_install_serve uv pip install --python "$SERVE_PY" -r train/requirements-serve.txt
+  uv pip freeze --python "$SERVE_PY" > logs/pip_freeze_serve.txt
 fi
 CURRENT_STEP="b: verify install"
-if ! run_step 02_verify "$VPY" - << 'PY'
-import sys
-import torch, transformers, vllm, nemo_automodel
-print("python", sys.version.split()[0], "| torch", torch.__version__, "| transformers", transformers.__version__,
-      "| vllm", vllm.__version__)
+VERIFY_PY='
+import importlib, sys
+mods = sys.argv[1:]
+import torch
+for m in mods:
+    importlib.import_module(m)
+vers = " | ".join(f"{m} {getattr(sys.modules[m], '"'"'__version__'"'"', '"'"'?'"'"')}" for m in ["torch", *mods])
+print("python", sys.version.split()[0], "|", vers)
 if not torch.cuda.is_available():
-    sys.exit("torch cannot see the GPU. Usual cause: the pod's NVIDIA driver is older than this torch build's CUDA. "
+    sys.exit("torch cannot see the GPU. Usual cause: the pod NVIDIA driver is older than this torch build CUDA. "
              "Pick a pod template with a newer driver (or CUDA 12.8+) and start over.")
 print("gpu:", torch.cuda.get_device_name(0))
-PY
-then
-  fail "install check failed (see logs/02_verify.log). Nothing has been trained."
+'
+if ! run_step 02_verify_train "$TRAIN_PY" -c "$VERIFY_PY" transformers nemo_automodel yaml; then
+  fail "train venv check failed (see logs/02_verify_train.log). Nothing has been trained."
+fi
+if ! run_step 02_verify_serve "$SERVE_PY" -c "$VERIFY_PY" transformers vllm openai; then
+  fail "serve venv check failed (see logs/02_verify_serve.log). Nothing has been trained."
 fi
 CURRENT_STEP="b: preflight (token lengths, loss mask)"
-if ! run_step 03_preflight "$VPY" scripts/preflight_train.py --tokenizer; then
+if ! run_step 03_preflight "$TRAIN_PY" scripts/preflight_train.py --tokenizer; then
   fail "preflight failed (logs/03_preflight.log). If it is the loss mask or a too-long row, stop here: training would be wrong."
 fi
 
@@ -329,7 +348,7 @@ rm -rf "$ADAPTER_DIR"
 mkdir -p "$ADAPTER_DIR"
 cp "$last_epoch_dir"/model/adapter_model.safetensors "$last_epoch_dir"/model/adapter_config.json "$ADAPTER_DIR"/
 echo "final adapter = $(basename "$last_epoch_dir") (the last epoch; LOWEST_VAL is not used)"
-"$VPY" - "$ADAPTER_DIR/adapter_config.json" << 'PY'
+"$TRAIN_PY" - "$ADAPTER_DIR/adapter_config.json" << 'PY'
 import json, sys
 c = json.load(open(sys.argv[1]))
 print({k: c.get(k) for k in ("peft_type", "r", "lora_alpha", "target_modules", "base_model_name_or_path")})
@@ -360,7 +379,7 @@ for name in qwen_prompted lora; do
   if [ -f "results/${name}_val_scores.json" ] && [ "$ALLOW_RESCORE" = 0 ] && [ "$name" != lora ]; then
     echo "$name: already scored, not rescoring (val is scored once; --allow-rescore to override)"; continue
   fi
-  run_step "07_score_$name" "$VPY" scripts/score.py --gold data/val.jsonl \
+  run_step "07_score_$name" "$SERVE_PY" scripts/score.py --gold data/val.jsonl \
     --preds "results/${name}_val_preds.jsonl" --name "$name"
 done
 echo

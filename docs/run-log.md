@@ -202,3 +202,11 @@ tar xzf gpu_session_*.tar.gz
 That puts `results/` (preds, scores, `summary.md`), `logs/` and `checkpoints/lora-v1/adapter/` in place. Rerun only training after a failure: `bash scripts/gpu_session.sh --skip-baseline --skip-install`. If training finished but vLLM rejected the adapter, reuse it instead of retraining: `bash scripts/gpu_session.sh --skip-baseline --skip-install --skip-train`.
 
 **Stop the pod as soon as the scp finishes.** The script ending does not stop billing. After the session, log the total minutes x the pod's hourly rate under GPU hours / spend above.
+
+### 2026-11-08: GPU session 1 stopped at install (two venvs now)
+
+The first pod run stopped in step b after about 0 minutes: uv could not resolve `train/requirements-gpu.txt`. vllm 0.32.0 pins `quack-kernels==0.6.5` and nemo-automodel 0.7.0 pins `quack-kernels==0.6.4` (linux), so one venv is unsatisfiable. The torch/transformers overlap noted above was real, but the check missed this transitive pin. Nothing was trained. The pod was stopped.
+
+Fix: the planned fallback, two venvs. `train/requirements-train.txt` → `.venv-train` (NeMo: preflight, training). `train/requirements-serve.txt` → `.venv-serve` (vLLM, `run_prompted.py`, `score.py`). They share only the adapter files on disk. Also fixed `run_step` so a failure no longer runs the STOPPED/tarball handler twice (the pipeline's subshell inherited the ERR trap under `set -E`).
+
+Before the next pod: resolve both files without installing (`uv pip compile <file> --python-version 3.11 --python-platform x86_64-manylinux_2_28`).

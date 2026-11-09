@@ -67,4 +67,6 @@ eval/ab_key.json
 logs/
 checkpoints/
 .venv-gpu/
+.venv-train/
+.venv-serve/
 gpu_session_*.tar.gz
